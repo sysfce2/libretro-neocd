@@ -6,12 +6,11 @@
 #include "libretro_common.h"
 #include "libretro_log.h"
 #include "neogeocd.h"
-#include "round.h"
 #include "timergroup.h"
 
 extern "C"
 {
-    #include "3rdparty/musashi/m68kcpu.h"
+    #include "3rdparty/musashi/m68kcpu.h" // IWYU pragma: keep
 }
 
 void watchdogTimerCallback(Timer* timer, uint32_t userData)
@@ -47,8 +46,7 @@ void vblIrqTimerCallback(Timer* timer, uint32_t userData)
 void hirqTimerCallback(Timer* timer, uint32_t userData)
 {
     // Trigger horizontal interrupt if enabled
-    if ((neocd->video.hirqControl & Video::HIRQ_CTRL_ENABLE)
-        && neocd->isHBLEnabled())
+    if ((neocd->video.hirqControl & Video::HIRQ_CTRL_ENABLE) && neocd->isHBLEnabled())
     {
 /*		Libretro::Log::message(RETRO_LOG_DEBUG, "Horizontal IRQ.@ (%d,%d), next drawline in : %d\n",
             neocd->getScreenX(),

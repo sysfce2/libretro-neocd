@@ -94,13 +94,20 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 {
     std::memset(info, 0, sizeof(retro_system_av_info));
 
+    const auto effectiveWidth = Video::FRAMEBUFFER_WIDTH - (globals.overscanH * 2);
+
     info->timing.fps = Timer::FRAME_RATE;
     info->timing.sample_rate = static_cast<double>(Audio::SAMPLE_RATE);
-    info->geometry.base_width = Video::FRAMEBUFFER_WIDTH - (globals.overscanH * 2);
+    info->geometry.base_width = effectiveWidth;
     info->geometry.base_height = Video::FRAMEBUFFER_HEIGHT;
     info->geometry.max_width = Video::FRAMEBUFFER_WIDTH;
     info->geometry.max_height = Video::FRAMEBUFFER_HEIGHT;
-    info->geometry.aspect_ratio = Video::ASPECT_RATIO;
+    if (globals.aspectRatio == AspectRatio::PAR_45_44)
+        info->geometry.aspect_ratio = effectiveWidth * 45.0f / 44.0f / Video::FRAMEBUFFER_HEIGHT;
+    else if (globals.aspectRatio == AspectRatio::DAR_4_3)
+        info->geometry.aspect_ratio = 4.0f / 3.0f;
+    else // AspectRatio::PAR_1_1
+        info->geometry.aspect_ratio = effectiveWidth / static_cast<float>(Video::FRAMEBUFFER_HEIGHT);
 }
 
 size_t retro_serialize_size(void)

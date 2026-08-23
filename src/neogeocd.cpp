@@ -4,12 +4,10 @@
 #include "3rdparty/z80/z80.h"
 #include "hlebios.h"
 #include "libretro_common.h"
-#include "m68kintf.h"
 #include "neogeocd.h"
 #include "3rdparty/musashi/m68k.h"
 #include "timer.h"
 #include "z80intf.h"
-#include "libretro_log.h"
 
 extern "C"
 {

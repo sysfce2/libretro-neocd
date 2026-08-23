@@ -7,7 +7,7 @@
 
 extern "C"
 {
-    #include "3rdparty/musashi/m68kcpu.h"
+    #include "3rdparty/musashi/m68kcpu.h" // IWYU pragma: keep
 }
 
 /*
@@ -271,7 +271,8 @@ static void cdInterfaceWriteByte(uint32_t address, uint32_t data)
 
                         This register has no influence whatsoever on the decoder IRQ (Verified on real hardware)
                     */
-//      Libretro::Log::message(RETRO_LOG_DEBUG, "FF0181: %02X\n", data);
+//        if ((data != 0) != neocd->cdCommunicationNReset)
+//            Libretro::Log::message(RETRO_LOG_DEBUG, "FF0181: %02X\n", data);
         neocd->cdCommunicationNReset = (data != 0);
         neocd->lc8951.resetPacketPointers();
         break;
@@ -327,13 +328,14 @@ static void cdInterfaceWriteWord(uint32_t address, uint32_t data)
                         0x500 IRQ1
                     */
         neocd->irqMask1 = data;
-//      Libretro::Log::message(RETRO_LOG_DEBUG, "IRQ MASK1=%04X MASK2=%04X\n", neocd->irqMask1, neocd->irqMask2);
+//        Libretro::Log::message(RETRO_LOG_DEBUG, "IRQ MASK1=%04X MASK2=%04X\n", neocd->irqMask1, neocd->irqMask2);
+        neocd->updateInterrupts();
         break;
 
     case 0x0004:    /*
                         FF0004: VBL Interrupt Mask
-                        0x731
-                        0x700   Unknown
+                        0x331
+                        0x300   HBL (BIOS sometimes write 731)
                         0x030   VBL
                         0x001   Unknown, writing zero causes a hard reset.
 
@@ -342,7 +344,8 @@ static void cdInterfaceWriteWord(uint32_t address, uint32_t data)
                         The VBL IRQ reconfigure mapped memory access to peek into the Z80 RAM, if this register is not emulated the system will end up overwriting the Z80 RAM.
                     */
         neocd->irqMask2 = data;
-//      Libretro::Log::message(RETRO_LOG_DEBUG, "IRQ MASK1=%04X MASK2=%04X\n", neocd->irqMask1, neocd->irqMask2);
+//        Libretro::Log::message(RETRO_LOG_DEBUG, "IRQ MASK1=%04X MASK2=%04X\n", neocd->irqMask1, neocd->irqMask2);
+        neocd->updateInterrupts();
         break;
 
     case 0x0064:    // FF0064: DMA Destination Address High Word

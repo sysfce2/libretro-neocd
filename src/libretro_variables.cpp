@@ -8,20 +8,42 @@
 #include "neogeocd.h"
 #include "video.h"
 
-// Variable names for the settings
-static const char* const REGION_VARIABLE = "neocd_region";
-static const char* const BIOS_VARIABLE = "neocd_bios";
-static const char* const SPEEDHACK_VARIABLE = "neocd_cdspeedhack";
-static const char* const LOADSKIP_VARIABLE = "neocd_loadskip";
-static const char* const PER_CONTENT_SAVES_VARIABLE = "neocd_per_content_saves";
-static const char* const OVERSCAN_H_VARIABLE = "neocd_overscan_h";
-static const char* const CPU_OVERCLOCK_VARIABLE = "neocd_cpu_overclock";
+// Variable names and descriptions for the settings
+static constexpr const char* VARIABLE_REGION = "neocd_region";
+static constexpr const char* DESC_REGION = "Console Region";
+static constexpr const char* VARIABLE_BIOS = "neocd_bios";
+static constexpr const char* DESC_BIOS = "BIOS Select";
+static constexpr const char* VARIABLE_SPEEDHACK = "neocd_cdspeedhack";
+static constexpr const char* DESC_SPEEDHACK = "CD Speed Hack";
+static constexpr const char* VARIABLE_LOADSKIP = "neocd_loadskip";
+static constexpr const char* DESC_LOADSKIP = "Skip CD Loading";
+static constexpr const char* VARIABLE_PER_CONTENT_SAVES = "neocd_per_content_saves";
+static constexpr const char* DESC_PER_CONTENT_SAVES = "Per-Game Saves (Restart)";
+static constexpr const char* VARIABLE_ASPECT_RATIO = "neocd_aspect_ratio";
+static constexpr const char* DESC_ASPECT_RATIO = "Aspect Ratio";
+static constexpr const char* VARIABLE_OVERSCAN_H = "neocd_overscan_h";
+static constexpr const char* DESC_OVERSCAN_H = "Horizontal Overscan Mask";
+static constexpr const char* VARIABLE_CPU_OVERCLOCK = "neocd_cpu_overclock";
+static constexpr const char* DESC_CPU_OVERCLOCK = "CPU Overclock";
 
-static const char* const CATEGORY_SYSTEM = "system";
-static const char* const CATEGORY_VIDEO = "video";
-static const char* const CATEGORY_AUDIO = "audio";
-static const char* const CATEGORY_INPUT = "input";
-static const char* const CATEGORY_ADVANCED = "advanced";
+// Categories
+static constexpr const char* CATEGORY_SYSTEM = "system";
+static constexpr const char* CATEGORY_VIDEO = "video";
+// static constexpr const char* CATEGORY_AUDIO = "audio";
+// static constexpr const char* CATEGORY_INPUT = "input";
+static constexpr const char* CATEGORY_ADVANCED = "advanced";
+
+// Values
+static constexpr const char* VALUE_ON = "On";
+static constexpr const char* VALUE_OFF = "Off";
+static constexpr const char* VALUE_JAPAN = "Japan";
+static constexpr const char* VALUE_USA = "USA";
+static constexpr const char* VALUE_EUROPE = "Europe";
+static constexpr const char* VALUE_1_1_PAR = "1:1 PAR";
+static constexpr const char* VALUE_45_44_PAR = "45:44 PAR";
+static constexpr const char* VALUE_4_3_DAR = "4:3 DAR";
+
+static constexpr std::initializer_list<const char*> VALUES_ONOFF{ VALUE_ON, VALUE_OFF };
 
 // All core variables
 static std::vector<retro_variable> variables;
@@ -37,6 +59,33 @@ static retro_core_option_v2_category coreOptionCategories[] = {
 };
 
 static retro_core_options_v2 coreOptionsV2 = { coreOptionCategories, nullptr };
+
+// Helper functions
+static inline bool string_is(const char* str, const char* value) { return (strcmp(str, value) == 0); }
+
+static inline bool string_to_bool(const char* str) { return string_is(str, VALUE_ON) ? true : false; }
+
+static inline uint32_t string_to_region(const char* str)
+{
+    if (string_is(str, VALUE_USA))
+        return NeoGeoCD::NationalityUSA;
+
+    if (string_is(str, VALUE_EUROPE))
+        return NeoGeoCD::NationalityEurope;
+
+    return NeoGeoCD::NationalityJapan;
+}
+
+static inline uint32_t string_to_aspect_ratio(const char* str)
+{
+    if (string_is(str, VALUE_45_44_PAR))
+        return AspectRatio::PAR_45_44;
+
+    if (string_is(str, VALUE_4_3_DAR))
+        return AspectRatio::DAR_4_3;
+
+    return AspectRatio::PAR_1_1;
+}
 
 static void buildBiosChoices()
 {
@@ -60,8 +109,7 @@ static void fillBasicOption(retro_core_option_v2_definition& option,
                             const char* desc,
                             const char* categoryKey,
                             const char* defaultValue,
-                            const char* const* values,
-                            size_t valueCount)
+                            const std::initializer_list<const char*>& values)
 {
     option = retro_core_option_v2_definition{};
     option.key = key;
@@ -70,12 +118,14 @@ static void fillBasicOption(retro_core_option_v2_definition& option,
     option.category_key = categoryKey;
 
     const size_t maxValues = RETRO_NUM_CORE_OPTION_VALUES_MAX - 1;
+    const size_t valueCount = values.size();
     const size_t count = valueCount > maxValues ? maxValues : valueCount;
+    const auto pValues = values.begin();
 
     for (size_t i = 0; i < count; ++i)
     {
-        option.values[i].value = values[i];
-        option.values[i].label = values[i];
+        option.values[i].value = pValues[i];
+        option.values[i].label = pValues[i];
     }
 
     option.values[count].value = NULL;
@@ -86,9 +136,9 @@ static void fillBasicOption(retro_core_option_v2_definition& option,
 static void fillBiosOption(retro_core_option_v2_definition& option)
 {
     option = retro_core_option_v2_definition{};
-    option.key = BIOS_VARIABLE;
-    option.desc = "BIOS Select";
-    option.desc_categorized = "BIOS Select";
+    option.key = VARIABLE_BIOS;
+    option.desc = DESC_BIOS;
+    option.desc_categorized = DESC_BIOS;
     option.category_key = CATEGORY_SYSTEM;
 
     size_t count = globals.biosList.size();
@@ -112,18 +162,19 @@ static void buildLegacyVariables()
 {
     variables.clear();
 
-    variables.emplace_back(retro_variable{ REGION_VARIABLE, "Region; Japan|USA|Europe" });
+    variables.emplace_back(retro_variable{ VARIABLE_REGION, "Region; Japan|USA|Europe" });
 
     buildBiosChoices();
 
     if (globals.biosList.size())
-        variables.emplace_back(retro_variable{ BIOS_VARIABLE, globals.biosChoices.c_str() });
+        variables.emplace_back(retro_variable{ VARIABLE_BIOS, globals.biosChoices.c_str() });
 
-    variables.emplace_back(retro_variable{ OVERSCAN_H_VARIABLE, "Horizontal Overscan Mask; 8|4|0|12|16" });
-    variables.emplace_back(retro_variable{ SPEEDHACK_VARIABLE, "CD Speed Hack; On|Off" });
-    variables.emplace_back(retro_variable{ CPU_OVERCLOCK_VARIABLE, "CPU Overclock; 100%|110%|125%|150%|200%" });
-    variables.emplace_back(retro_variable{ LOADSKIP_VARIABLE, "Skip CD Loading; On|Off" });
-    variables.emplace_back(retro_variable{ PER_CONTENT_SAVES_VARIABLE, "Per-Game Saves (Restart); Off|On" });
+    variables.emplace_back(retro_variable{ VARIABLE_OVERSCAN_H, "Horizontal Overscan Mask; 8|4|0|12|16" });
+    variables.emplace_back(retro_variable{ VARIABLE_SPEEDHACK, "CD Speed Hack; On|Off" });
+    variables.emplace_back(retro_variable{ VARIABLE_CPU_OVERCLOCK, "CPU Overclock; 100%|110%|125%|150%|200%" });
+    variables.emplace_back(retro_variable{ VARIABLE_LOADSKIP, "Skip CD Loading; On|Off" });
+    variables.emplace_back(retro_variable{ VARIABLE_PER_CONTENT_SAVES, "Per-Game Saves (Restart); Off|On" });
+    variables.emplace_back(retro_variable{ VARIABLE_ASPECT_RATIO, "Aspect Ratio; 1:1 PAR|45:44 PAR|4:3 DAR" });
 
     variables.emplace_back(retro_variable{ nullptr, nullptr });
 }
@@ -131,12 +182,11 @@ static void buildLegacyVariables()
 static void buildCoreOptionsV2()
 {
     coreOptionDefinitions.clear();
-    coreOptionDefinitions.reserve(7);
+    coreOptionDefinitions.reserve(8);
 
     retro_core_option_v2_definition option;
 
-    const char* const regionValues[] = { "Japan", "USA", "Europe" };
-    fillBasicOption(option, REGION_VARIABLE, "Region", CATEGORY_SYSTEM, "Japan", regionValues, 3);
+    fillBasicOption(option, VARIABLE_REGION, DESC_REGION, CATEGORY_SYSTEM, VALUE_JAPAN, { VALUE_JAPAN, VALUE_USA, VALUE_EUROPE });
     coreOptionDefinitions.emplace_back(option);
 
     if (!globals.biosList.empty())
@@ -145,23 +195,23 @@ static void buildCoreOptionsV2()
         coreOptionDefinitions.emplace_back(option);
     }
 
-    const char* const overscanValues[] = { "8", "4", "0", "12", "16" };
-    fillBasicOption(option, OVERSCAN_H_VARIABLE, "Horizontal Overscan Mask", CATEGORY_VIDEO, "8", overscanValues, 5);
+    fillBasicOption(option, VARIABLE_OVERSCAN_H, DESC_OVERSCAN_H, CATEGORY_VIDEO, "8", { "8", "4", "0", "12", "16" });
     coreOptionDefinitions.emplace_back(option);
 
-    const char* const onOffValues[] = { "On", "Off" };
-    fillBasicOption(option, SPEEDHACK_VARIABLE, "CD Speed Hack", CATEGORY_ADVANCED, "On", onOffValues, 2);
+    // OFF by default because I am not certain this has no undesirable side effects
+    fillBasicOption(option, VARIABLE_SPEEDHACK, DESC_SPEEDHACK, CATEGORY_ADVANCED, VALUE_OFF, VALUES_ONOFF);
     coreOptionDefinitions.emplace_back(option);
 
-    fillBasicOption(option, LOADSKIP_VARIABLE, "Skip CD Loading", CATEGORY_ADVANCED, "On", onOffValues, 2);
+    fillBasicOption(option, VARIABLE_LOADSKIP, DESC_LOADSKIP, CATEGORY_ADVANCED, VALUE_ON, VALUES_ONOFF);
     coreOptionDefinitions.emplace_back(option);
 
-    const char* const overclockValues[] = { "100%", "110%", "125%", "150%", "200%" };
-    fillBasicOption(option, CPU_OVERCLOCK_VARIABLE, "CPU Overclock", CATEGORY_ADVANCED, "100%", overclockValues, 5);
+    fillBasicOption(option, VARIABLE_CPU_OVERCLOCK, DESC_CPU_OVERCLOCK, CATEGORY_ADVANCED, "100%", { "100%", "110%", "125%", "150%", "200%" });
     coreOptionDefinitions.emplace_back(option);
 
-    const char* const offOnValues[] = { "Off", "On" };
-    fillBasicOption(option, PER_CONTENT_SAVES_VARIABLE, "Per-Game Saves (Restart)", CATEGORY_SYSTEM, "Off", offOnValues, 2);
+    fillBasicOption(option, VARIABLE_PER_CONTENT_SAVES, DESC_PER_CONTENT_SAVES, CATEGORY_SYSTEM, VALUE_OFF, VALUES_ONOFF);
+    coreOptionDefinitions.emplace_back(option);
+
+    fillBasicOption(option, VARIABLE_ASPECT_RATIO, DESC_ASPECT_RATIO, CATEGORY_VIDEO, VALUE_1_1_PAR, { VALUE_1_1_PAR, VALUE_45_44_PAR, VALUE_4_3_DAR });
     coreOptionDefinitions.emplace_back(option);
 
     coreOptionDefinitions.emplace_back(retro_core_option_v2_definition{});
@@ -191,16 +241,11 @@ void Libretro::Variables::update(bool needReset)
     struct retro_variable var;
 
     var.value = NULL;
-    var.key = REGION_VARIABLE;
+    var.key = VARIABLE_REGION;
 
     if (libretro.environment(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
-        uint32_t nationality = NeoGeoCD::NationalityJapan;
-
-        if (!strcmp(var.value, "USA"))
-            nationality = NeoGeoCD::NationalityUSA;
-        else if (!strcmp(var.value, "Europe"))
-            nationality = NeoGeoCD::NationalityEurope;
+        const auto nationality = string_to_region(var.value);
 
         if (neocd->machineNationality != nationality)
         {
@@ -210,7 +255,7 @@ void Libretro::Variables::update(bool needReset)
     }
 
     var.value = NULL;
-    var.key = BIOS_VARIABLE;
+    var.key = VARIABLE_BIOS;
 
     if (libretro.environment(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
@@ -225,7 +270,7 @@ void Libretro::Variables::update(bool needReset)
     }
 
     var.value = NULL;
-    var.key = OVERSCAN_H_VARIABLE;
+    var.key = VARIABLE_OVERSCAN_H;
 
     if (libretro.environment(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
@@ -238,23 +283,19 @@ void Libretro::Variables::update(bool needReset)
         {
             globals.overscanH = newValue;
 
-            struct retro_game_geometry geometry;
-            geometry.base_width = Video::FRAMEBUFFER_WIDTH - (globals.overscanH * 2);
-            geometry.base_height = Video::FRAMEBUFFER_HEIGHT;
-            geometry.max_width = Video::FRAMEBUFFER_WIDTH;
-            geometry.max_height = Video::FRAMEBUFFER_HEIGHT;
-            geometry.aspect_ratio = Video::ASPECT_RATIO;
-
-            libretro.environment(RETRO_ENVIRONMENT_SET_GEOMETRY, &geometry);
+            struct retro_system_av_info avinfo;
+            retro_get_system_av_info(&avinfo);
+            libretro.environment(RETRO_ENVIRONMENT_SET_GEOMETRY, &avinfo);
         }
     }
 
     var.value = NULL;
-    var.key = SPEEDHACK_VARIABLE;
+    var.key = VARIABLE_SPEEDHACK;
 
     if (libretro.environment(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
-        bool newValue = strcmp(var.value, "On") ? false : true;
+        const auto newValue = string_to_bool(var.value);
+
         if (globals.cdSpeedHack != newValue)
         {
             globals.cdSpeedHack = newValue;
@@ -264,13 +305,13 @@ void Libretro::Variables::update(bool needReset)
     }
 
     var.value = NULL;
-    var.key = LOADSKIP_VARIABLE;
+    var.key = VARIABLE_LOADSKIP;
 
     if (libretro.environment(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-        globals.skipCDLoading = strcmp(var.value, "On") ? false : true;
+        globals.skipCDLoading = string_to_bool(var.value);
 
     var.value = NULL;
-    var.key = CPU_OVERCLOCK_VARIABLE;
+    var.key = VARIABLE_CPU_OVERCLOCK;
 
     if (libretro.environment(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
     {
@@ -280,10 +321,27 @@ void Libretro::Variables::update(bool needReset)
     }
 
     var.value = NULL;
-    var.key = PER_CONTENT_SAVES_VARIABLE;
+    var.key = VARIABLE_PER_CONTENT_SAVES;
 
     if (libretro.environment(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-        globals.perContentSaves = strcmp(var.value, "On") ? false : true;
+        globals.perContentSaves = string_to_bool(var.value);
+
+    var.value = NULL;
+    var.key = VARIABLE_ASPECT_RATIO;
+
+    if (libretro.environment(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+    {
+        const auto aspectRatio = string_to_aspect_ratio(var.value);
+
+        if (globals.aspectRatio != aspectRatio)
+        {
+            globals.aspectRatio = aspectRatio;
+
+            struct retro_system_av_info avinfo;
+            retro_get_system_av_info(&avinfo);
+            libretro.environment(RETRO_ENVIRONMENT_SET_GEOMETRY, &avinfo);
+        }
+    }
 
     if (needReset)
         neocd->reset();
