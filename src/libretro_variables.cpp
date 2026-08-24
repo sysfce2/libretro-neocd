@@ -43,7 +43,12 @@ static constexpr const char* VALUE_1_1_PAR = "1:1 PAR";
 static constexpr const char* VALUE_45_44_PAR = "45:44 PAR";
 static constexpr const char* VALUE_4_3_DAR = "4:3 DAR";
 
-static constexpr std::initializer_list<const char*> VALUES_ONOFF{ VALUE_ON, VALUE_OFF };
+// Value lists (NULL terminated)
+static const char* const VALUES_ONOFF[] = { VALUE_ON, VALUE_OFF, NULL };
+static const char* const VALUES_REGION[] = { VALUE_JAPAN, VALUE_USA, VALUE_EUROPE, NULL };
+static const char* const VALUES_OVERSCAN_H[] = { "8", "4", "0", "12", "16", NULL };
+static const char* const VALUES_CPU_OVERCLOCK[] = { "100%", "110%", "125%", "150%", "200%", NULL };
+static const char* const VALUES_ASPECT_RATIO[] = { VALUE_1_1_PAR, VALUE_45_44_PAR, VALUE_4_3_DAR, NULL };
 
 // All core variables
 static std::vector<retro_variable> variables;
@@ -109,7 +114,7 @@ static void fillBasicOption(retro_core_option_v2_definition& option,
                             const char* desc,
                             const char* categoryKey,
                             const char* defaultValue,
-                            const std::initializer_list<const char*>& values)
+                            const char* const* values)
 {
     option = retro_core_option_v2_definition{};
     option.key = key;
@@ -118,14 +123,13 @@ static void fillBasicOption(retro_core_option_v2_definition& option,
     option.category_key = categoryKey;
 
     const size_t maxValues = RETRO_NUM_CORE_OPTION_VALUES_MAX - 1;
-    const size_t valueCount = values.size();
-    const size_t count = valueCount > maxValues ? maxValues : valueCount;
-    const auto pValues = values.begin();
+    size_t count = 0;
 
-    for (size_t i = 0; i < count; ++i)
+    while (count < maxValues && values[count])
     {
-        option.values[i].value = pValues[i];
-        option.values[i].label = pValues[i];
+        option.values[count].value = values[count];
+        option.values[count].label = values[count];
+        ++count;
     }
 
     option.values[count].value = NULL;
@@ -186,7 +190,7 @@ static void buildCoreOptionsV2()
 
     retro_core_option_v2_definition option;
 
-    fillBasicOption(option, VARIABLE_REGION, DESC_REGION, CATEGORY_SYSTEM, VALUE_JAPAN, { VALUE_JAPAN, VALUE_USA, VALUE_EUROPE });
+    fillBasicOption(option, VARIABLE_REGION, DESC_REGION, CATEGORY_SYSTEM, VALUE_JAPAN, VALUES_REGION);
     coreOptionDefinitions.emplace_back(option);
 
     if (!globals.biosList.empty())
@@ -195,7 +199,7 @@ static void buildCoreOptionsV2()
         coreOptionDefinitions.emplace_back(option);
     }
 
-    fillBasicOption(option, VARIABLE_OVERSCAN_H, DESC_OVERSCAN_H, CATEGORY_VIDEO, "8", { "8", "4", "0", "12", "16" });
+    fillBasicOption(option, VARIABLE_OVERSCAN_H, DESC_OVERSCAN_H, CATEGORY_VIDEO, "8", VALUES_OVERSCAN_H);
     coreOptionDefinitions.emplace_back(option);
 
     // OFF by default because I am not certain this has no undesirable side effects
@@ -205,13 +209,13 @@ static void buildCoreOptionsV2()
     fillBasicOption(option, VARIABLE_LOADSKIP, DESC_LOADSKIP, CATEGORY_ADVANCED, VALUE_ON, VALUES_ONOFF);
     coreOptionDefinitions.emplace_back(option);
 
-    fillBasicOption(option, VARIABLE_CPU_OVERCLOCK, DESC_CPU_OVERCLOCK, CATEGORY_ADVANCED, "100%", { "100%", "110%", "125%", "150%", "200%" });
+    fillBasicOption(option, VARIABLE_CPU_OVERCLOCK, DESC_CPU_OVERCLOCK, CATEGORY_ADVANCED, "100%", VALUES_CPU_OVERCLOCK);
     coreOptionDefinitions.emplace_back(option);
 
     fillBasicOption(option, VARIABLE_PER_CONTENT_SAVES, DESC_PER_CONTENT_SAVES, CATEGORY_SYSTEM, VALUE_OFF, VALUES_ONOFF);
     coreOptionDefinitions.emplace_back(option);
 
-    fillBasicOption(option, VARIABLE_ASPECT_RATIO, DESC_ASPECT_RATIO, CATEGORY_VIDEO, VALUE_1_1_PAR, { VALUE_1_1_PAR, VALUE_45_44_PAR, VALUE_4_3_DAR });
+    fillBasicOption(option, VARIABLE_ASPECT_RATIO, DESC_ASPECT_RATIO, CATEGORY_VIDEO, VALUE_1_1_PAR, VALUES_ASPECT_RATIO);
     coreOptionDefinitions.emplace_back(option);
 
     coreOptionDefinitions.emplace_back(retro_core_option_v2_definition{});
