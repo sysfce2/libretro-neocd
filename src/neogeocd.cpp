@@ -185,6 +185,11 @@ void NeoGeoCD::runOneFrame()
     }
 
     audio.finalize();
+
+    /* Where the frame's counts, if this is a build that takes them, get
+       their look at; in any other build the call asks for nothing.
+    */
+    video.noteFrame();
 }
 
 void NeoGeoCD::setInterrupt(NeoGeoCD::Interrupt interrupt)

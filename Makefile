@@ -1,6 +1,7 @@
 STATIC_LINKING := 0
 AR             := ar
 HAVE_CDROM     := 0
+VIDEO_STATS    := 0
 USE_LTO        := 0
 NEED_RWAV      := 1
 NEED_RVORBIS   := 1
@@ -252,6 +253,18 @@ endif
 ifeq ($(HAVE_CDROM), 1)
    CFLAGS += -DHAVE_CDROM
    CXXFLAGS += -DHAVE_CDROM
+endif
+
+# What the renderer counts, reported to the log every few seconds. Off
+# unless asked for: make VIDEO_STATS=1. Passed one way or the other
+# rather than only when set, so that no file in the core is left guessing
+# at a flag its neighbours can see.
+ifeq ($(VIDEO_STATS), 1)
+   CFLAGS += -DVIDEO_STATS=1
+   CXXFLAGS += -DVIDEO_STATS=1
+else
+   CFLAGS += -DVIDEO_STATS=0
+   CXXFLAGS += -DVIDEO_STATS=0
 endif
 
 ifeq ($(USE_LTO), 1)
