@@ -1,10 +1,12 @@
 build
 distclean
+.clangd
 .clang-format
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 .vscode
+.zed
 *.o
 *.so
 *.dll
